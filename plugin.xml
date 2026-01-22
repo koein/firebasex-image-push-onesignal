@@ -4,7 +4,7 @@
     id="firebasex-image-push-onesignal"
     version="3.3.3">
 
-  <name>OneSignal Push Notifications</name>
+  <name>Firebasex Image Push OneSignal</name>
   <author>Josh Kasten, Bradley Hesse, Rodrigo Gomez-Palacio</author>
 
   <description>
