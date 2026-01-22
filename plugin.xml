@@ -90,38 +90,30 @@
         <pod name="OneSignalXCFramework" spec="3.12.10" />
       </pods>
     </podspec>
+    
 
     <!-- Main app bridge -->
     <header-file src="src/ios/OneSignalPush.h" />
     <source-file src="src/ios/OneSignalPush.m" />
 
-    <!-- 🔥 NOTIFICATION SERVICE EXTENSION -->
-    <ios-extension
-        name="OneSignalNotificationServiceExtension"
-        type="app-extension">
+<!-- 🔥 NOTIFICATION SERVICE EXTENSION -->
+<ios-extension
+    name="OneSignalNotificationServiceExtension"
+    type="com.apple.product-type.app-extension"
+    bundle-id="${PACKAGE_NAME}.onesignalservice">
 
-        <config-file target="OneSignalNotificationServiceExtension/Info.plist" parent="NSExtension">
-            <dict>
-                <key>NSExtensionPointIdentifier</key>
-                <string>com.apple.usernotifications.service</string>
-                <key>NSExtensionPrincipalClass</key>
-                <string>NotificationService</string>
-            </dict>
-        </config-file>
+    <framework src="UserNotifications.framework" />
 
-        <resource-file
-            src="src/ios/OneSignalNotificationServiceExtension/NotificationService.swift"
-            target="OneSignalNotificationServiceExtension/NotificationService.swift" />
+    <info-plist src="src/ios/OneSignalNotificationServiceExtension/Info.plist" />
 
-        <resource-file
-            src="src/ios/OneSignalNotificationServiceExtension/Info.plist"
-            target="OneSignalNotificationServiceExtension/Info.plist" />
+    <entitlements
+        src="src/ios/OneSignalNotificationServiceExtension/OneSignalNotificationServiceExtension.entitlements" />
 
-        <resource-file
-            src="src/ios/OneSignalNotificationServiceExtension/OneSignalNotificationServiceExtension.entitlements"
-            target="OneSignalNotificationServiceExtension/OneSignalNotificationServiceExtension.entitlements" />
+    <source-file
+        src="src/ios/OneSignalNotificationServiceExtension/NotificationService.swift" />
 
-    </ios-extension>
+</ios-extension>
+
 
   </platform>
 
