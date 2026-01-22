@@ -1,5 +1,4 @@
 import UserNotifications
-import OneSignal
 
 class NotificationService: UNNotificationServiceExtension {
 
@@ -11,61 +10,51 @@ class NotificationService: UNNotificationServiceExtension {
         withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void
     ) {
         self.contentHandler = contentHandler
-        bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
+        self.bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
 
-        guard let bestAttemptContent = bestAttemptContent else {
+        guard let bestAttemptContent = self.bestAttemptContent else {
             contentHandler(request.content)
             return
         }
 
-        let userInfo = request.content.userInfo
+        // ✅ MARK EXTENSION EXECUTION (VISIBLE)
+        bestAttemptContent.body += "\n[EXTENSION ACTIVE]"
 
-        // Let OneSignal handle its own payload
-        OneSignal.didReceiveNotificationExtensionRequest(
-            request,
-            with: bestAttemptContent
-        )
+        // ✅ MARK EXTENSION EXECUTION (DATA FLAG)
+        var userInfo = bestAttemptContent.userInfo
+        userInfo["__extension_ran"] = true
+        bestAttemptContent.userInfo = userInfo
 
-        // Firebase image support
-        var imageUrl: String?
+        // ✅ MARK EXTENSION EXECUTION (FILE)
+        writeExtensionHeartbeat()
 
-        if let fcmOptions = userInfo["fcm_options"] as? [String: Any],
+        let payload = bestAttemptContent.userInfo
+
+        // 🔴 SUPPORT FIREBASE IMAGE
+        var imageUrlString: String?
+
+        if let fcmOptions = payload["fcm_options"] as? [String: Any],
            let image = fcmOptions["image"] as? String {
-            imageUrl = image
+            imageUrlString = image
         }
 
-        if let notification = userInfo["notification"] as? [String: Any],
-           let image = notification["image"] as? String {
-            imageUrl = image
+        if imageUrlString == nil,
+           let image = payload["image"] as? String {
+            imageUrlString = image
         }
 
-        guard let imageUrlString = imageUrl,
-              let imageURL = URL(string: imageUrlString) else {
+        guard let imageUrl = imageUrlString,
+              let url = URL(string: imageUrl) else {
             contentHandler(bestAttemptContent)
             return
         }
 
-        URLSession.shared.downloadTask(with: imageURL) { tempURL, _, _ in
-            guard let tempURL = tempURL else {
-                contentHandler(bestAttemptContent)
-                return
-            }
-
-            let localURL = URL(fileURLWithPath: NSTemporaryDirectory())
-                .appendingPathComponent(imageURL.lastPathComponent)
-
-            try? FileManager.default.moveItem(at: tempURL, to: localURL)
-
-            if let attachment = try? UNNotificationAttachment(
-                identifier: "image",
-                url: localURL,
-                options: nil
-            ) {
+        downloadImage(from: url) { attachment in
+            if let attachment = attachment {
                 bestAttemptContent.attachments = [attachment]
             }
-
             contentHandler(bestAttemptContent)
-        }.resume()
+        }
     }
 
     override func serviceExtensionTimeWillExpire() {
@@ -74,4 +63,36 @@ class NotificationService: UNNotificationServiceExtension {
             contentHandler(bestAttemptContent)
         }
     }
-}
+
+    // MARK: - Image Download
+    private func downloadImage(from url: URL, completion: @escaping (UNNotificationAttachment?) -> Void) {
+
+        let task = URLSession.shared.downloadTask(with: url) { location, _, _ in
+            guard let location = location else {
+                completion(nil)
+                return
+            }
+
+            let tmpDir = URL(fileURLWithPath: NSTemporaryDirectory())
+            let fileURL = tmpDir.appendingPathComponent(url.lastPathComponent)
+
+            try? FileManager.default.removeItem(at: fileURL)
+            try? FileManager.default.moveItem(at: location, to: fileURL)
+
+            do {
+                let attachment = try UNNotificationAttachment(
+                    identifier: "image",
+                    url: fileURL,
+                    options: nil
+                )
+                completion(attachment)
+            } catch {
+                completion(nil)
+            }
+        }
+
+        task.resume()
+    }
+
+    // MARK: - Extension Heartbeat (PROOF)
+    private func writeExtensionHeartbeat() {
